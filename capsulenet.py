@@ -14,6 +14,7 @@ Result:
     About 110 seconds per epoch on a single GTX1070 GPU card
     
 Author: Xifeng Guo, E-mail: `guoxifeng1990@163.com`, Github: `https://github.com/XifengGuo/CapsNet-Keras`
+Modifyed: Micah Sherry
 """
 
 import numpy as np
@@ -135,7 +136,7 @@ def train(model,  # type: models.Model
     model.fit(train_generator(x_train, y_train, args.batch_size, args.shift_fraction),
               steps_per_epoch=int(y_train.shape[0] / args.batch_size),
               epochs=args.epochs,
-              validation_data=((x_test, y_test), (y_test, x_test)), batch_size=args.batch_size,
+              validation_data=((x_test, y_test), (y_test, x_test)), batch_size=args.batch_size, validation_steps =1,
               callbacks=[log, checkpoint, lr_decay])
     # End: Training with data augmentation -----------------------------------------------------------------------#
 
@@ -198,8 +199,32 @@ def load_mnist():
     x_test = x_test.reshape(-1, 28, 28, 1).astype('float32') / 255.
     y_train = to_categorical(y_train.astype('float32'))
     y_test = to_categorical(y_test.astype('float32'))
+    print(y_train)
     return (x_train, y_train), (x_test, y_test)
 
+def load_from_path(path="../COSC481/dcnn/spark22/train", image_shape=(28,28), limit=-1):
+    from sklearn.model_selection import train_test_split
+    from sklearn.preprocessing import OneHotEncoder
+    import cv2  
+    images = []
+    labels = []
+    for root, dirs, files in os.walk(path):
+        for file in files[0:limit]:
+            if file.endswith('.jpg'):
+                image_path = os.path.join(root, file)
+                image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+                
+                image = cv2.resize(image, image_shape)
+
+                images.append(image) 
+                labels.append(root.split("/")[-1])
+    
+    x = np.array(images)/255
+    x= x.reshape(x.shape[0], x.shape[1], x.shape[2], 1)
+    y = np.array(labels).reshape(-1,1)
+    y = OneHotEncoder(sparse_output=False).fit_transform(y)
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2)
+    return (x_train, y_train), (x_test, y_test)
 
 if __name__ == "__main__":
     import os
@@ -237,8 +262,10 @@ if __name__ == "__main__":
         os.makedirs(args.save_dir)
 
     # load data
-    (x_train, y_train), (x_test, y_test) = load_mnist()
-
+    (x_train, y_train), (x_test, y_test) = load_from_path()
+    print(x_train.shape,y_train.shape)    
+    #(x_train, y_train), (x_test, y_test) = load_mnist()
+    #print(x_train.shape,y_train.shape)    
     # define model
     model, eval_model, manipulate_model = CapsNet(input_shape=x_train.shape[1:],
                                                   n_class=len(np.unique(np.argmax(y_train, 1))),
@@ -256,3 +283,7 @@ if __name__ == "__main__":
             print('No weights are provided. Will test using random initialized weights.')
         manipulate_latent(manipulate_model, (x_test, y_test), args)
         test(model=eval_model, data=(x_test, y_test), args=args)
+
+
+
+
